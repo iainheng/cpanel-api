@@ -4,6 +4,7 @@ namespace ZanySoft\Cpanel;
 
 use Config;
 use Exception;
+use Illuminate\Support\Arr;
 
 class Cpanel extends xmlapi
 {
@@ -395,6 +396,19 @@ class Cpanel extends xmlapi
         if (isset($result['data'])) {
             $data = $result['data'];
             if (is_array($data)) {
+                // try to get reason and result if response contains multiple index of data
+                if (!data_get($data, 'reason')) {
+                    $data = Arr::first($data);
+
+                    // when cpanel return "data":[1] in it's success response
+                    if ($data === 1) {
+                        $data =  [
+                            'reason' => '',
+                            'result' => 1,
+                        ];
+                    }
+                }
+
                 $reason = (string)$data['reason'];
                 $status = (string)$data['result'];
 
