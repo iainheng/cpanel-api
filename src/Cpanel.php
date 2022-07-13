@@ -249,7 +249,7 @@ class Cpanel extends xmlapi
 
         $result = $this->api2_query($this->username, "MysqlFE", "createdb", array('db' => $database_name));
 
-        return $this->returnResult(data_get($result, 'cpanelresult'));
+        return $this->returnResult($result);
     }
 
     /**
@@ -389,6 +389,8 @@ class Cpanel extends xmlapi
             $json = json_encode($result);
             $result = json_decode($json, TRUE);
         }
+
+        $result = data_get($result, 'cpanelresult');
 
         if (isset($result['data'])) {
             $data = $result['data'];
