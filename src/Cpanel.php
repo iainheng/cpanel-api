@@ -326,7 +326,7 @@ class Cpanel extends xmlapi
      * @param string $privileges
      * @return array|mixed
      */
-    protected function setdbuser(string $db_name, string $db_user, string $privileges = '')
+    public function setdbuser(string $db_name, string $db_user, string $privileges = '')
     {
 
         if (!isset($db_name) || !isset($db_user)) {
