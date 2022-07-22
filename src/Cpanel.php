@@ -250,6 +250,9 @@ class Cpanel extends xmlapi
 
         $result = $this->api2_query($this->username, "MysqlFE", "createdb", array('db' => $database_name));
 
+        if ($this->get_debug())
+            error_log($result);
+
         return $this->returnResult($result);
     }
 
@@ -345,6 +348,9 @@ class Cpanel extends xmlapi
         $privileges = $privileges ? $privileges : 'ALL PRIVILEGES';
 
         $added = $this->api2_query($this->username, "MysqlFE", "setdbuserprivileges", array('privileges' => $privileges, 'dbuser' => $dbuser, 'db' => $dbname));
+
+        if ($this->get_debug())
+            error_log($added);
 
         return $this->returnResult($added);
     }
