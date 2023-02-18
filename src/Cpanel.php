@@ -402,6 +402,50 @@ class Cpanel extends xmlapi
     }
 
     /**
+     * @param string $newdomain
+     * @param string $subdomain
+     * @param string $dir
+     * @param string $username
+     * @param bool $ftp_is_optional
+     * @return array|mixed
+     */
+    public function createAddonDomain($newdomain, $subdomain, $dir = '', $username = '', $ftp_is_optional = 1)
+    {
+        $dir = $dir ?: config('cpanel.subdomain_dir');
+
+        $username = $username ?: $this->username;
+
+        $result = $this->api2_query($username, 'AddonDomain', 'addaddondomain', array(
+                'newdomain' => $newdomain,
+                'subdomain' => $subdomain,
+                'dir' => $dir,
+                'ftp_is_optional' => $ftp_is_optional
+            )
+        );
+
+        return $this->returnResult($result);
+    }
+
+    /**
+     * @param string $newdomain
+     * @param string $subdomain The addon domain's username, an underscore (_), and the addon domain's main domain.
+     * @param string $username
+     * @return array|mixed
+     */
+    public function deleteAddonDomain($addon_domain, $subdomain, $username = '')
+    {
+        $username = $username ?: $this->username;
+
+        $result = $this->api2_query($username, 'AddonDomain', 'deladdondomain', array(
+                'domain' => $addon_domain,
+                'subdomain' => $subdomain,
+            )
+        );
+
+        return $this->returnResult($result);
+    }
+
+    /**
      * @param $result
      * @return array|mixed
      */
