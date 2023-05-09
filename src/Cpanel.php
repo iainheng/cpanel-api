@@ -388,13 +388,25 @@ class Cpanel extends xmlapi
         return $this->accountsummary($username);
     }
 
-    public function createEmailAccount($email, $password, $quota = 500, $main_domain = '')
+    public function createEmailAccount($username, $password, $domain, $quota = 500, $sendWelcomeEmail = 0)
     {
         $result = $this->api2_query($this->username, 'Email', 'addpop', [
-                'domain' => $main_domain,
-                'email' => $email,
+                'domain' => $domain,
+                'email' => $username,
                 'password' => $password,
-                'quota' => $quota
+                'quota' => $quota,
+                'send_welcome_email' => $sendWelcomeEmail,
+            ]
+        );
+
+        return $this->returnResult($result);
+    }
+
+    public function deleteEmailAccount($username, $domain)
+    {
+        $result = $this->api2_query($this->username, 'Email', 'delpop', [
+                'domain' => $domain,
+                'email' => $username,
             ]
         );
 
