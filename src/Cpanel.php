@@ -466,8 +466,13 @@ class Cpanel extends xmlapi
             $result = json_decode($json, TRUE);
         }
 
+        if (data_get($result, 'cpanelresult')) {
+            $result = data_get($result, 'cpanelresult');
+        }
+
         if (isset($result['data'])) {
-            $data = $result['data'];
+            $data = is_array($result['data']) ? $result['data'][0] : $result['data'];
+
             if (is_array($data)) {
                 $reason = (string)(is_array($data['reason']) ? implode(', ', $data['reason']) : $data['reason']);
                 $result = (string)(is_array($data['result']) ? array_shift($data['result']) : $data['result']);
