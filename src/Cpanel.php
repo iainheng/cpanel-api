@@ -7,532 +7,445 @@ use Exception;
 
 class Cpanel extends xmlapi
 {
-    protected $config;
-
-    /**
-     * @var string
-     */
     protected $username = '';
 
-    /**
-     * @var string
-     */
-    protected $password = '';
+    private const MYSQL_MODULE = 'MysqlFE';
+    private const SUBDOMAIN_MODULE = 'SubDomain';
+    private const EMAIL_MODULE = 'Email';
 
     /**
      * All parameters to this function are optional and can be set via the accessor functions or constants
      *
-     * @param string $host The host to perform queries on
-     * @param string $username The username to authenticate as
-     * @param string $password The password to authenticate with
+     * @param  string|null  $host  The host to perform queries on
+     * @param  string|null  $username  The username to authenticate as
+     * @param  string|null  $password  The password to authenticate with
      * @throws Exception
      */
-    public function __construct($host = null, $username = null, $password = null)
+    public function __construct(?string $host = null, ?string $username = null, ?string $password = null)
     {
+
         $config = Config::get('cpanel');
 
-        $host = $host ?: $config['ip'];
+        $protocol = $config['protocol'] ?? 'https';
+        $host = $host ?: ($config['host'] ?? $config['ip']);
         $username = $username ?: $config['username'];
         $password = $password ?: $config['password'];
 
         if (!$host) {
-            throw new Exception('Host IP not defined.');
+            throw new Exception('Host not defined.');
         }
-
-        $this->setAuth($username, $password);
-        $this->setHost($host);
-        $this->set_debug($config['debug']);
-        $this->setPort($config['port']);
 
         parent::__construct($host, $username, $password);
+
+        $auth_type = $config['auth_type'] ?? 'pass';
+
+        $this->set_auth_type($auth_type);
+        if ($auth_type == 'hash') {
+            $hash = $config['hash'] ?? '';
+            $this->setHashAuth($username, $hash);
+        } else {
+            $this->setAuth($username, $password);
+        }
+
+        $this->setProtocol($protocol);
+        $this->setHost($host);
+        $this->setPort($config['port']);
+
+        $this->set_debug($config['debug'] ?? 0);
+        $this->set_output($config['output'] ?? 'array');
     }
 
-    /**
-     * @return $this
-     */
-    public function make($host = null, $username = null, $password = null): Cpanel
+    public static function make(?string $host = null, ?string $username = null, ?string $password = null): self
     {
-        if ($host) {
-            $this->set_host($host);
-        }
-        if ($username) {
-            $this->set_user($username);
-        }
-        if ($password) {
-            $this->set_password($password);
-        }
+        return new self($host, $username, $password);
+    }
+
+    public function setProtocol(string $protocol): self
+    {
+        $this->set_protocol($protocol);
+
         return $this;
     }
 
-    /**
-     * @param $host
-     * @return $this
-     */
-    public function setHost($host): Cpanel
+    public function setHost(string $host): self
     {
         $this->set_host($host);
 
         return $this;
     }
 
-    /**
-     * @param $port
-     * @return $this
-     * @throws Exception
-     */
-    public function setPort($port): Cpanel
+    public function setPort(int $port): self
     {
         $this->set_port($port);
 
         return $this;
     }
 
-    /**
-     * @param $username
-     * @param $password
-     * @return $this
-     */
-    public function setAuth($username, $password): Cpanel
+    public function setAuth(string $username, string $password): self
     {
         $this->username = $username;
-        $this->password = $password;
 
         $this->password_auth($username, $password);
 
         return $this;
     }
 
-    /**
-     * @param $user
-     * @param $module
-     * @param $function
-     * @param $args
-     * @return array|mixed
-     */
-    public function api1($user, $module, $function, $args = array())
+    public function setHashAuth(string $username, string $hash): self
     {
-        if (!isset($user) || !isset($module) || !isset($function)) {
-            $msg = "api1 requires that a username, module and function are passed to it";
+        $this->username = $username;
 
-            return array('reason' => $msg, 'result' => 0);
+        $this->hash_auth($username, $hash);
+
+        return $this;
+    }
+
+
+    /**
+     * Call an API1 function
+     *
+     *  This function allows you to call API1 from within the XML-API,  This allowes a user to peform actions
+     *  such as adding ftp accounts, etc
+     *
+     * @param  string  $user  The username of the account to perform API1 actions on
+     * @param  string  $module  The module of the API1 call to use
+     * @param  string  $function  The function of the API1 call
+     * @param  array  $args  The arguments for the API1 function, this should be a non-associative array
+     * @return mixed
+     */
+    public function api1(string $user, string $module, string $function, array $args = []): array
+    {
+
+        if (!$user || !$module || !$function) {
+            return ['reason' => 'api1 requires username, module and function', 'result' => 0];
         }
-        if (!is_array($args)) {
-            $msg = "api2_query requires that an array is passed to it as the 4th parameter";
 
-            return array('reason' => $msg, 'result' => 0);
-        }
-
-        $result = $this->api1_query($user, $module, $function, $args = array());
+        $result = $this->api1_query($user, $module, $function, $args);
 
         return $this->returnResult($result);
     }
 
     /**
-     * @param $user
-     * @param $module
-     * @param $function
-     * @param $args
-     * @return array|mixed
+     * Call an API2 Function
+     *
+     *  This function allows you to call an API2 function, this is the modern API for cPanel and should be used in preference over
+     *  API1 when possible
+     *
+     * @param  string  $user  The username of the account to perform API2 actions on
+     * @param  string  $module  The module of the API2 call to use
+     * @param  string  $function  The function of the API2 call
+     * @param  array  $args  An associative array containing the arguments for the API2 call
+     * @return mixed
      */
-    public function api2($user, $module, $function, $args = array())
+    public function api2(string $user, string $module, string $function, array $args = []): array
     {
-
-        if (!isset($user) || !isset($module) || !isset($function)) {
-            $msg = "api2 requires that a username, module and function are passed to it";
-
-            return array('reason' => $msg, 'result' => 0);
-        }
-        if (!is_array($args)) {
-            $msg = "api2_query requires that an array is passed to it as the 4th parameter";
-
-            return array('reason' => $msg, 'result' => 0);
+        if (!$user || !$module || !$function) {
+            return ['reason' => 'api2 requires username, module and function', 'result' => 0];
         }
 
-        $result = $this->api2_query($user, $module, $function, $args);
+        try {
+            $result = $this->api2_query($user, $module, $function, $args);
 
-        return $this->returnResult($result);
+            return $this->returnResult($result);
+        } catch (\Exception $e) {
+            return [
+                'reason' => $e->getMessage(),
+                'result' => null
+            ];
+        }
     }
 
-    /**
-     * @param $subdomain
-     * @param $username
-     * @param $subdomain_dir
-     * @param $main_domain
-     * @return array|mixed
-     */
-    public function createSubdomain($subdomain, $username = '', $subdomain_dir = '', $main_domain = '')
+    public function createSubdomain(string $subdomain, string $username = '', string $subdomain_dir = '', string $main_domain = ''): array
     {
 
-        $subdomain_dir = $subdomain_dir ? $subdomain_dir : config('cpanel.subdomain_dir');
-        $username = $username ? $username : $this->username;
-        $domain = $main_domain ? $main_domain : config('cpanel.domain');
+        $subdomain_dir = $subdomain_dir ?: config('cpanel.subdomain_dir');
+        $username = $username ?: $this->username;
+        $domain = $this->parseDomain($main_domain ?: config('cpanel.domain'));
 
-        $parse = parse_url($domain);
-
-        if (isset($parse['host'])) {
-            $domain = $parse['host'];
-        } else if (mb_strpos($domain, '/', 2) !== false) {
-            $domain = strstr($domain, '/', true);
+        if (!$domain) {
+            return ['reason' => 'Please provide a valid main domain', 'result' => 0];
         }
 
-        $domain = str_replace('www.', '', $domain);
-
-        if (!$domain || mb_strpos($domain, '.') === false) {
-            return array('reason' => 'Please sent main domain first', 'result' => 0);
-        }
-
-        $result = $this->api2_query($username, 'SubDomain', 'addsubdomain', array(
-                'domain' => $subdomain,
-                'rootdomain' => $domain,
-                'dir' => $subdomain_dir,
-                'disallowdot' => 1
-            )
-        );
-
-        return $this->returnResult($result);
+        return $this->api2($username, self::SUBDOMAIN_MODULE, 'addsubdomain', [
+            'domain' => $subdomain,
+            'rootdomain' => $domain,
+            'dir' => $subdomain_dir,
+            'disallowdot' => 1
+        ]);
     }
 
-    /**
-     * @param string $subdomain
-     * @param string $main_domain
-     * @return array|mixed
-     */
-    public function removeSubdomain(string $subdomain, string $main_domain = '')
+    public function removeSubdomain(string $subdomain, string $main_domain = ''): array
     {
 
-        $username = $this->username;
-        $domain = $main_domain ? $main_domain : config('cpanel.domain');
+        $domain = $this->parseDomain($main_domain ?: config('cpanel.domain'));
 
-        $parse = parse_url($domain);
-
-        if (isset($parse['host'])) {
-            $domain = $parse['host'];
-        } else if (mb_strpos($domain, '/', 2) !== false) {
-            $domain = strstr($domain, '/', true);
+        if (!$domain) {
+            return ['reason' => 'Please provide a valid main domain', 'result' => 0];
         }
 
-        $domain = str_replace('www.', '', $domain);
-
-        if (!$domain || mb_strpos($domain, '.') === false) {
-            return array('reason' => 'Please sent main domain first', 'result' => 0);
-        }
-
-        $result = $this->api2_query($username, 'SubDomain', 'delsubdomain', array(
-                'domain' => $subdomain . '.' . $domain,
-            )
-        );
-
-        return $this->returnResult($result);
+        return $this->api2($this->username, self::SUBDOMAIN_MODULE, 'delsubdomain', [
+            'domain' => $subdomain.'.'.$domain
+        ]);
     }
 
-    /**
-     * @param string $db_name
-     * @return array|mixed
-     */
-    public function createdb(string $db_name)
+    public function createdb(string $databaseName): array
     {
 
-        if (!isset($db_name) || empty($db_name)) {
-            $msg = "database name is  required.";
-
-            return array('reason' => $msg, 'result' => 0);
+        if (!$databaseName) {
+            return ['reason' => 'Database name is required', 'result' => 0];
         }
 
-        $name_length = 63;
-        if (!$this->hasUsernamePrefixed($db_name)) {
-            $name_length = $name_length - (strlen($this->username) + 1);
+        $databaseName = $this->fixName($databaseName);
+
+        if ($invalid = $this->isNameInvalid($databaseName, 64)) {
+            return ['reason' => $invalid, 'result' => 0];
         }
 
-        $database_name = $this->fixName($db_name);
-
-        if (strlen($db_name) > $name_length || strlen($db_name) < 4) {
-            return array('reason' => 'Database name should be greater than 4 and less than ' . $name_length . ' characters.', 'result' => 0);
-        }
-
-        $result = $this->api2_query($this->username, "MysqlFE", "createdb", array('db' => $database_name));
-
-        return $this->returnResult($result);
+        return $this->api2($this->username, self::MYSQL_MODULE, 'createdb', ['db' => $databaseName]);
     }
 
-    public function deletedb($db_name)
+    public function deletedb(string $databaseName): array
     {
-        if (!isset($db_name) || empty($db_name)) {
-            $msg = "database name is  required.";
-            return array('reason' => $msg, 'result' => 0);
+        if (!$databaseName) {
+            return ['reason' => 'Database name is required', 'result' => 0];
         }
 
-        $db_name = $this->fixName($db_name);
-
-        $result = $this->api2_query($this->username, "MysqlFE", "deletedb", array('db' => $db_name));
-
-        return $this->returnResult($result);
+        $databaseName = $this->fixName($databaseName);
+        return $this->api2($this->username, self::MYSQL_MODULE, 'deletedb', ['db' => $databaseName]);
     }
 
-    /**
-     * @param string $db_user
-     * @return array|mixed
-     */
-    public function checkdbuser(string $db_user)
+    public function checkdbuser(string $databaseUser): array
     {
-        if (!isset($db_user) || empty($db_user)) {
-            $msg = "Database username is  required.";
-
-            return array('reason' => $msg, 'result' => 0);
+        if (!$databaseUser) {
+            return ['reason' => 'Database username is required', 'result' => 0];
         }
 
-        $dbuser = $this->fixName(($db_user ?: 'myadmin'));
-
-        $user = $this->api2_query($this->username, "MysqlFE", "dbuserexists", array('dbuser' => $dbuser));
-
-        return $this->returnResult($user);
+        $databaseUser = $this->fixName($databaseUser);
+        return $this->api2($this->username, self::MYSQL_MODULE, 'dbuserexists', ['dbuser' => $databaseUser]);
     }
 
-    /**
-     * @param $db_user
-     * @param $db_pass
-     * @return array|mixed|string[]
-     */
-    public function createdbuser($db_user, $db_pass)
+    public function createdbuser(string $username, string $password): array
     {
-
-        if (!isset($db_user) || !isset($db_pass)) {
-            $msg = "Database username and password is required.";
-
-            return array('reason' => $msg, 'result' => 0);
+        if (!$username || !$password) {
+            return ['reason' => 'Database username and password are required', 'result' => 0];
         }
 
-        if (!$db_user || !$db_pass) {
-            return array('reason' => 'Please sent database username and password.', 'result' => '0');
+        if ($invalid = $this->isNameInvalid($username, 32, 'username')) {
+            return ['reason' => $invalid, 'result' => 0];
         }
 
-        $name_length = 32;
-        if (!$this->hasUsernamePrefixed($db_user)) {
-            $name_length = $name_length - (strlen($this->username) + 1);
+        $isInvalid = $this->checkPassword($password);
+        if ($isInvalid) {
+            return [
+                'reason' => $isInvalid[0],
+                'errors' => $isInvalid,
+                'result' => '0'
+            ];
         }
 
-        $dbuser = $this->fixName($db_user);
-
-        if (strlen($db_user) > $name_length || strlen($db_user) < 4) {
-            return array('reason' => 'Database username should be greater than 4 and less than ' . $name_length . ' characters.', 'result' => 0);
-        }
-
-        $validate = $this->checkPassword($db_pass);
-
-        if ($validate != '') {
-            return array('reason' => $validate, 'result' => '0');
-        }
-
-        $user = $this->checkdbuser($dbuser);
+        $username = $this->fixName($username);
+        $user = $this->checkdbuser($username);
 
         if ($user['result'] == 1) {
-            return array('reason' => 'Database user ' . $dbuser . ' already exist.', 'result' => '0');
-        } else {
-            $user = $this->api2_query(
-                $this->username,
-                "MysqlFE",
-                "createdbuser",
-                array('dbuser' => $dbuser, 'password' => $db_pass)
-            );
-
-            return $this->returnResult($user);
+            return ['reason' => 'Database user '.$username.' already exists.', 'result' => 0];
         }
+
+        return $this->api2($this->username, self::MYSQL_MODULE, 'createdbuser', [
+                'dbuser' => $username,
+                'password' => $password
+            ]
+        );
     }
 
-    /**
-     * @param string $db_name
-     * @param string $db_user
-     * @param string $privileges
-     * @return array|mixed
-     */
-    public function setdbuser(string $db_name, string $db_user, string $privileges = '')
+    public function setdbuser(string $databaseName, string $databaseUser, string|array $privileges = ''): array
     {
 
-        if (!isset($db_name) || !isset($db_user)) {
-            $msg = "Database name and username is required.";
-
-            return array('reason' => $msg, 'result' => 0);
+        if (!$databaseName || !$databaseUser) {
+            return ['reason' => 'Database name and username are required', 'result' => 0];
         }
 
-        $dbname = $this->fixName($db_name);
-        $dbuser = $this->fixName($db_user);
+        $databaseName = $this->fixName($databaseName);
+        $databaseUser = $this->fixName($databaseUser);
 
         if (is_array($privileges)) {
             $privileges = implode(',', $privileges);
         }
 
-        $privileges = $privileges ? $privileges : 'ALL PRIVILEGES';
-
-        $added = $this->api2_query($this->username, "MysqlFE", "setdbuserprivileges", array('privileges' => $privileges, 'dbuser' => $dbuser, 'db' => $dbname));
-
-        return $this->returnResult($added);
+        return $this->api2($this->username, self::MYSQL_MODULE, 'setdbuserprivileges', [
+            'privileges' => $privileges,
+            'dbuser' => $databaseUser,
+            'db' => $databaseName
+        ]);
     }
 
-    /**
-     * @param string $search_type
-     * @param string $search
-     * @return array|mixed
-     */
-    public function accountsList(string $search_type = '', string $search = '')
+    public function accountsList(string $search_type = '', string $search = ''): array
     {
         return $this->returnResult($this->listaccts($search_type, $search));
     }
 
-    /**
-     * @param string $username
-     * @return array|bool|mixed|SimpleXMLElement|null
-     */
-    public function accountDetials(string $username = '')
+    public function accountDetails(string $username = ''): mixed
     {
-        $username = $username ? $username : $this->username;
+        $username = $username ?: $this->username;
 
-        return $this->accountsummary($username);
+        return $this->returnResult($this->accountsummary($username));
     }
 
-    public function createEmailAccount($email, $password, $quota = 500, $main_domain = '')
+    /**
+     * @deprecated
+     */
+    public function accountDetials(string $username = ''): mixed
     {
-        $result = $this->api2_query($this->username, 'Email', 'addpop', [
+        return $this->accountDetails($username);
+    }
+
+    public function createEmailAccount(string $email, string $password, int $quota = 500, string $main_domain = ''): array
+    {
+        return $this->api2($this->username, self::EMAIL_MODULE, 'addpop', [
                 'domain' => $main_domain,
                 'email' => $email,
                 'password' => $password,
                 'quota' => $quota
             ]
         );
-
-        return $this->returnResult($result);
     }
 
-    /**
-     * @param $result
-     * @return array|mixed
-     */
-    protected function returnResult($result)
+    protected function returnResult($result): mixed
     {
-
-        if ($this->get_output() == 'xml') {
-            $response = simplexml_load_string($result, null, LIBXML_NOERROR | LIBXML_NOWARNING);
-
-            if ($response) {
-                $json = json_encode($response);
-                $result = json_decode($json, TRUE);
-            }
-        } else if ($this->get_output() == 'json') {
-            $result = json_decode($result, TRUE);
-        } else {
-            $json = json_encode($result);
-            $result = json_decode($json, TRUE);
+        if (is_bool($result)) {
+            return ['reason' => '', 'result' => $result];
         }
 
-        if (isset($result['data'])) {
-            $data = $result['data'];
-            if (is_array($data)) {
-                $reason = (string)(is_array($data['reason']) ? implode(', ', $data['reason']) : $data['reason']);
-                $result = (string)(is_array($data['result']) ? array_shift($data['result']) : $data['result']);
-
-                if (mb_strpos($reason, ')') !== false) {
-                    $reason = ltrim(strstr($reason, ')'), ') ');
-                }
-
-                if (mb_strpos($reason, ' at ') !== false) {
-                    $reason = trim(strstr($reason, ' at ', true));
-                }
-
-                return array('reason' => $reason, 'result' => (int)$result);
-            } else {
-                if (isset($result['func'])) {
-                    $function = $result['func'];
-                    $status = $data;
-
-                    switch ($function) {
-                        case 'createdb':
-                            $reason = 'Database' . ($status ? ' ' : ' not ') . 'created successfully';
-                            break;
-                        case 'createdbuser':
-                            $reason = 'Database user' . ($status ? ' ' : ' not ') . 'created successfully';
-                            break;
-                        case 'dbuserexists':
-                            $reason = 'Database user' . ($status ? ' ' : ' not ') . 'exist';
-                            break;
-                        case 'addsubdomain':
-                            $reason = 'Subdomain ' . ($status ? ' created successfully.' : ' not created.');
-                            break;
-                        case 'delsubdomain':
-                            $reason = 'Subdomain ' . ($status ? ' removed successfully.' : ' not removed.');
-                            break;
-                        case 'setdbuserprivileges':
-                            $reason = 'Database user privileges ' . ($status ? ' set successfully.' : ' not set.');
-                            break;
-                        default:
-                            $reason = '';
-                    }
-                }
-
-                return array('reason' => $reason, 'result' => (int)$data);
+        if ($this->get_output() === 'xml') {
+            $response = simplexml_load_string($result, null, LIBXML_NOERROR | LIBXML_NOWARNING);
+            if ($response) {
+                $result = json_decode(json_encode($response), true);
             }
+        } elseif ($this->get_output() === 'json') {
+            $result = json_decode($result, true);
         } else {
+            $result = json_decode(json_encode($result), true);
+        }
+
+        if (!isset($result['data'])) {
             return $result;
         }
+
+        $data = $result['data'];
+        if (is_array($data)) {
+            $reason = (string) (is_array($data['reason']) ? implode(', ', $data['reason']) : $data['reason']);
+            $resultValue = (string) (is_array($data['result']) ? array_shift($data['result']) : $data['result']);
+
+            $reason = $this->cleanReason($reason);
+            return ['reason' => $reason, 'result' => (int) $resultValue];
+        }
+
+        $reason = $this->getOperationMessage($result['func'] ?? null, $data);
+
+        return ['reason' => $reason, 'result' => (int) $data];
     }
 
-    /**
-     * @param $title
-     * @param string $separator
-     * @return string
-     */
-    protected function slug($title, $separator = '-')
+
+    protected function parseDomain(string $domain): string
+    {
+        $parse = parse_url($domain);
+
+        if (isset($parse['host'])) {
+            $domain = $parse['host'];
+        } elseif (mb_strpos($domain, '/', 2) !== false) {
+            $domain = strstr($domain, '/', true);
+        }
+
+        $domain = str_replace('www.', '', $domain);
+
+        return (mb_strpos($domain, '.') !== false) ? $domain : '';
+    }
+
+    protected function isNameInvalid(string $name, int $maxLength, string $for = 'name'): ?string
+    {
+        $length = strlen($name);
+
+        if ($this->hasUsernamePrefixed($name)) {
+            $length = $length - (strlen($this->username) + 1);
+        }
+
+        if ($length < 4) {
+            return $maxLength
+                ? "Database {$for} must be between 4 and {$maxLength} characters"
+                : "Database {$for} must be at least 4 characters";
+        }
+
+        if ($maxLength && $length > $maxLength) {
+            return "Database {$for} must not exceed {$maxLength} characters";
+        }
+
+        return null;
+    }
+
+    protected function checkPassword(string $pwd): ?array
+    {
+        $errors = [];
+        if (strlen($pwd) < 8) {
+            $errors[] = 'Password must be at least 8 characters';
+        }
+        if (!preg_match('#[0-9]+#', $pwd)) {
+            $errors[] = 'Password must contain at least one number';
+        }
+
+        if (!preg_match('#[a-zA-Z]+#', $pwd)) {
+            $errors[] = 'Password must contain at least one letter';
+        }
+
+        return !empty($errors) ? $errors : null;
+    }
+
+    protected function slug(string $title, string $separator = '-'): string
     {
         // Convert all dashes/underscores into separator
-        $flip = $separator == '-' ? '_' : '-';
+        $flip = $separator === '-' ? '_' : '-';
 
-        $title = preg_replace('![' . preg_quote($flip) . ']+!u', $separator, $title);
+        $title = preg_replace('!['.preg_quote($flip,'/').']+!u', $separator, $title);
 
         // Remove all characters that are not the separator, letters, numbers, or whitespace.
-        $title = preg_replace('![^' . preg_quote($separator) . '\pL\pN\s]+!u', '', mb_strtolower($title));
+        $title = preg_replace('![^'.preg_quote($separator,'/').'\pL\pN\s]+!u', '', mb_strtolower($title));
 
         // Replace all separator characters and whitespace by a single separator
-        $title = preg_replace('![' . preg_quote($separator) . '\s]+!u', $separator, $title);
+        $title = preg_replace('!['.preg_quote($separator,'/').'\s]+!u', $separator, $title);
 
         return trim($title, $separator);
     }
 
-    /**
-     * @param $pwd
-     * @return string
-     */
-    protected function checkPassword($pwd)
+    protected function hasUsernamePrefixed(string $name): bool
     {
-        if (strlen($pwd) < 8) {
-            return "Password too short!";
-        }
-
-        if (!preg_match("#[0-9]+#", $pwd)) {
-            return "Password must include at least one number!";
-        }
-
-        if (!preg_match("#[a-zA-Z]+#", $pwd)) {
-            return "Password must include at least one letter!";
-        }
-
-        return '';
+        return strpos(strtolower($name), strtolower($this->username)) === 0;
     }
 
-
-    /**
-     * @param $name
-     * @return bool
-     */
-    protected function hasUsernamePrefixed($name): bool
+    protected function fixName(string $name): string
     {
-        if (substr(strtolower($name), 0, strlen($this->username)) == strtolower($this->username)) {
-            return true;
-        }
-        return false;
+        return $this->hasUsernamePrefixed($name) ? $name : $this->username.'_'.$name;
     }
 
-    protected function fixName($name)
+    private function cleanReason(string $reason): string
     {
-        if (!$this->hasUsernamePrefixed($name)) {
-            $name = $this->username . "_" . $name;
+        if (mb_strpos($reason, ')') !== false) {
+            $reason = ltrim(strstr($reason, ')'), ') ');
         }
-        return $name;
+        if (mb_strpos($reason, ' at ') !== false) {
+            $reason = trim(strstr($reason, ' at ', true));
+        }
+
+        return $reason;
+    }
+
+    private function getOperationMessage(?string $function, $status): string
+    {
+        $messages = [
+            'createdb' => 'Database'.($status ? ' ' : ' not ').'created successfully',
+            'createdbuser' => 'Database user'.($status ? ' ' : ' not ').'created successfully',
+            'dbuserexists' => 'Database user '.($status ? 'exists' : 'does not exist'),
+            'addsubdomain' => 'Subdomain '.($status ? 'created successfully' : 'not created'),
+            'delsubdomain' => 'Subdomain '.($status ? 'removed successfully' : 'not removed'),
+            'setdbuserprivileges' => 'Database user privileges '.($status ? 'set successfully' : 'not set'),
+        ];
+
+        return $messages[$function] ?? '';
     }
 }
