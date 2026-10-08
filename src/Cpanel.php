@@ -44,6 +44,9 @@ class Cpanel extends xmlapi
         if ($auth_type == 'hash') {
             $hash = $config['hash'] ?? '';
             $this->setHashAuth($username, $hash);
+        } elseif ($auth_type == 'token') {
+            $token = $config['token'] ?? '';
+            $this->setTokenAuth($username, $token);
         } else {
             $this->setAuth($username, $password);
         }
@@ -96,6 +99,15 @@ class Cpanel extends xmlapi
         $this->username = $username;
 
         $this->hash_auth($username, $hash);
+
+        return $this;
+    }
+
+    public function setTokenAuth(string $username, string $token): self
+    {
+        $this->username = $username;
+
+        $this->token_auth($username, $token);
 
         return $this;
     }

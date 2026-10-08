@@ -443,18 +443,19 @@ class xmlapi
     * This class is capable of authenticating with both hash auth and password auth
     * This function will allow you to manually set which auth_type you are using.
     *
-    * the only accepted parameters for this function are "hash" and "pass" anything else will cuase
+    * the only accepted parameters for this function are "hash", "pass" and "token" anything else will cuase
     * an exception to be thrown
     *
     * @see set_password()
     * @see set_hash()
+    * @see set_token()
     * @see get_auth_type()
     * @param string auth_type the auth type to be set
     */
     public function set_auth_type( $auth_type )
     {
-        if ($auth_type != 'hash' && $auth_type != 'pass') {
-            throw new Exception('the only two allowable auth types arehash and path');
+        if ($auth_type != 'hash' && $auth_type != 'pass' && $auth_type != 'token') {
+            throw new Exception('the only allowable auth types are hash, pass and token');
         }
         $this->auth_type = $auth_type;
     }
@@ -490,6 +491,22 @@ class xmlapi
     {
         $this->auth_type = 'hash';
         $this->auth = preg_replace("/(\n|\r|\s)/", '', $hash);
+    }
+
+    /**
+    * Set the cPanel API token to authenticate with
+    *
+    * This will set the API token (created in cPanel under Manage API Tokens) to authenticate with,
+    * the auth_type will automatically be set when this function is used.
+    * @param string $token the API token to authenticate with
+    * @see set_password()
+    * @see set_auth_type()
+    * @see set_user()
+    */
+    public function set_token( $token )
+    {
+        $this->auth_type = 'token';
+        $this->auth = trim($token);
     }
 
     /**
@@ -546,6 +563,20 @@ class xmlapi
     public function password_auth( $user, $pass )
     {
         $this->set_password( $pass );
+        $this->set_user( $user );
+    }
+
+    /**
+    * Set the user and cPanel API token to be used for authentication
+    *
+    * @param string $user username
+    * @param string $token cPanel API token
+    * @see set_token()
+    * @see set_user()
+    */
+    public function token_auth( $user, $token )
+    {
+        $this->set_token( $token );
         $this->set_user( $user );
     }
 
@@ -665,6 +696,8 @@ class xmlapi
             $authstr = 'Authorization: WHM ' . $this->user . ':' . $this->auth . "\r\n";
         } elseif ($this->auth_type == 'pass') {
             $authstr = 'Authorization: Basic ' . base64_encode($this->user .':'. $this->auth) . "\r\n";
+        } elseif ($this->auth_type == 'token') {
+            $authstr = 'Authorization: cpanel ' . $this->user . ':' . $this->auth . "\r\n";
         } else {
             throw new Exception('invalid auth_type set');
         }

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static \ZanySoft\Cpanel\Cpanel   setPort(int $port): \ZanySoft\Cpanel\Cpanel
  * @method static \ZanySoft\Cpanel\Cpanel   setAuth(string $username, string $password): \ZanySoft\Cpanel\Cpanel
  * @method static \ZanySoft\Cpanel\Cpanel   setHashAuth(string $username, string $hash): \ZanySoft\Cpanel\Cpanel
+ * @method static \ZanySoft\Cpanel\Cpanel   setTokenAuth(string $username, string $token): \ZanySoft\Cpanel\Cpanel
  * @method static \ZanySoft\Cpanel\Cpanel   createdb(string $databaseName)
  * @method static \ZanySoft\Cpanel\Cpanel   deletedb(string $databaseName)
  * @method static \ZanySoft\Cpanel\Cpanel   checkdbuser(string $databaseUser)

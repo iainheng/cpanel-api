@@ -39,6 +39,11 @@ You can create a new Cpanel instance.
     $cpanel->setAuth($username, $password) //if you don't want to set in config file
     return $cpanel->api2($user, $module, $function, $args = array());
 
+If your cPanel server rejects password logins for API calls, create an API token in cPanel
+(Security > Manage API Tokens) and set `auth_type` to `token` and `token` in the config file, or:
+
+    $cpanel->setTokenAuth($username, $token);
+
 Or use the facade:
 
     return Cpanel::api2($user, $module, $function, $args = array());

@@ -70,7 +70,7 @@ return [
     * Set the auth type
     *--------------------------------------------------------------------------
     *
-    * The only accepted values are "hash" and "pass". Any other value will cause an exception to be thrown.
+    * The only accepted values are "hash", "pass" and "token". Any other value will cause an exception to be thrown.
     */
 
     'auth_type' => 'pass',
@@ -90,6 +90,15 @@ return [
     */
 
     'hash' => '',
+
+    /*
+    *--------------------------------------------------------------------------
+    * Set the cPanel API token used for authentication. If you set auth_type to token
+    *--------------------------------------------------------------------------
+    * Create the token in cPanel under Security > Manage API Tokens.
+    */
+
+    'token' => '',
 
     /*
     *--------------------------------------------------------------------------
