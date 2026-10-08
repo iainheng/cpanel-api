@@ -1,38 +1,51 @@
 {
-    "name": "zanysoft/cpanel-api",
-    "description": "Cpanel's API",
-    "keywords": [
-        "laravel",
-        "laravel9",
-        "cpanel",
-        "cpanel api",
-        "whm"
-    ],
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Zany Soft",
-            "email": "info@zanysoft.net"
-        }
-    ],
-    "require": {
-        "php": ">=7.4",
-        "illuminate/support": "^6.0 |^7.0|^8.0|^9.0|^10.0|^11.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "ZanySoft\\Cpanel\\": "src/"
-        }
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "ZanySoft\\Cpanel\\CpanelServiceProvider"
-            ],
-            "aliases": {
-                "Cpanel": "ZanySoft\\Cpanel\\Facades\\Cpanel"
-            }
-        }
-    },
-    "minimum-stability": "stable"
+  "name": "zanysoft/cpanel-api",
+  "description": "Laravel package for cPanel and WHM API integration",
+  "type": "library",
+  "keywords": [
+    "laravel",
+    "cpanel",
+    "cpanel-api",
+    "whm",
+    "hosting",
+    "api-client"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/zanysoft/cpanel-api",
+  "authors": [
+    {
+      "name": "Mubashar Ahmad",
+      "email": "zanysoft.us@gmail.com",
+      "role": "Developer"
+    }
+  ],
+  "support": {
+    "email": "zanysoft.us@gmail.com"
+  },
+  "require": {
+    "php": "^8.1",
+    "illuminate/support": "^9.0|^10.0|^11.0|^12.0|^13.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "ZanySoft\\Cpanel\\": "src/"
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "php-http/discovery": true
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "ZanySoft\\Cpanel\\CpanelServiceProvider"
+      ],
+      "aliases": {
+        "Cpanel": "ZanySoft\\Cpanel\\Facades\\Cpanel"
+      }
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }
