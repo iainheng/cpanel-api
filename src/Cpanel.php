@@ -403,12 +403,21 @@ class Cpanel extends xmlapi
             $data = $data[0];
         }
 
-        if (is_array($data)) {
-            $reason = (string) (is_array($data['reason']) ? implode(', ', $data['reason']) : $data['reason']);
+        if (is_array($data) && array_key_exists('result', $data)) {
+            $reason = $data['reason'] ?? ($result['error'] ?? '');
+            $reason = (string) (is_array($reason) ? implode(', ', $reason) : $reason);
             $resultValue = (string) (is_array($data['result']) ? array_shift($data['result']) : $data['result']);
 
             $reason = $this->cleanReason($reason);
             return ['reason' => $reason, 'result' => (int) $resultValue];
+        }
+
+        if (is_array($data)) {
+            // Empty or list data (e.g. delete and list calls): fall back to the event result and error
+            $status = (int) ($result['event']['result'] ?? (empty($result['error']) ? 1 : 0));
+            $reason = $result['error'] ?? $this->getOperationMessage($result['func'] ?? null, $status);
+
+            return ['reason' => $this->cleanReason((string) $reason), 'result' => $status];
         }
 
         $reason = $this->getOperationMessage($result['func'] ?? null, $data);
@@ -512,6 +521,7 @@ class Cpanel extends xmlapi
     {
         $messages = [
             'createdb' => 'Database'.($status ? ' ' : ' not ').'created successfully',
+            'deletedb' => 'Database '.($status ? 'deleted successfully' : 'not deleted'),
             'createdbuser' => 'Database user'.($status ? ' ' : ' not ').'created successfully',
             'dbuserexists' => 'Database user '.($status ? 'exists' : 'does not exist'),
             'addsubdomain' => 'Subdomain '.($status ? 'created successfully' : 'not created'),
