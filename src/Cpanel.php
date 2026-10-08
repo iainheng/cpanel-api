@@ -283,6 +283,8 @@ class Cpanel extends xmlapi
             $privileges = implode(',', $privileges);
         }
 
+        $privileges = $privileges ?: 'ALL PRIVILEGES';
+
         return $this->api2($this->username, self::MYSQL_MODULE, 'setdbuserprivileges', [
             'privileges' => $privileges,
             'dbuser' => $databaseUser,
